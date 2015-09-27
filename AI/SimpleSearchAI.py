@@ -1,3 +1,5 @@
+__author__ = 'Chandler Underwood and Casey Sigelmann'
+
 import random
 from Building import Building
 from Inventory import Inventory

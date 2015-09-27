@@ -1,4 +1,4 @@
-__author__ = 'Max'
+__author__ = 'Max Robinsom and Casey Sigelmann'
 
 from Player import *
 
