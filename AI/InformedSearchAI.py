@@ -1,14 +1,11 @@
 __author__ = 'Ryson Asuncion and Casey Sigelmann'
 
-import random
 from Building import Building
 from Inventory import Inventory
 from Player import *
-from Constants import *
-from Construction import CONSTR_STATS, Construction
-from Ant import UNIT_STATS, Ant
-from Move import Move
-from GameState import addCoords, GameState
+from Construction import Construction
+from Ant import Ant
+from GameState import GameState
 from AIPlayerUtils import *
 from Node import *
 
@@ -24,9 +21,6 @@ from Node import *
 ##
 class AIPlayer(Player):
 
-    # Member Variables
-    depthLimit = 1
-
     #__init__
     #Description: Creates a new Player
     #
@@ -35,6 +29,8 @@ class AIPlayer(Player):
     ##
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "Sigelmann_Asuncion Informed Search")
+        self.depthLimit = 2
+        self.stepsToReachMap = []
 
     ##
     #getPlacement
@@ -51,6 +47,7 @@ class AIPlayer(Player):
     #Return: The coordinates of where the construction is to be placed
     ##
     def getPlacement(self, currentState):
+        self.stepsToReachMap = []
         numToPlace = 0
         #implemented by students to return their next move
         if currentState.phase == SETUP_PHASE_1:    #stuff on my side
@@ -100,17 +97,33 @@ class AIPlayer(Player):
     #Return: The Move to be made
     ##
     def getMove(self, currentState):
-        moves = listAllLegalMoves(currentState)
-        bestMove = moves[-1]
-        bestScore = -1
-        for move in moves:
-            resultingState = self.processMove(currentState, move)
-            score = self.evaluateState(resultingState)
-            if score > bestScore:
-                bestScore = score
-                bestMove = move
 
-        return bestMove
+        # initialize mapping of steps to reach for workers
+        if self.stepsToReachMap == []:
+            for x in range(0, 10):
+                verticleArray = []
+                for y in range(0, 10):
+                    # find the lowest steps to reach for food
+                    stepsToReachFood = 999 # arbitrarily large number
+                    for food in getConstrList(currentState, None, [FOOD]):
+                        stepsToReachFood = min(stepsToReachFood, stepsToReach(currentState, (x, y), food.coords))
+
+                    # find the lowest steps to reach for tunnel or anthill
+                    stepsToReachTunnel = 999
+                    for constr in getConstrList(currentState, self.playerId, [TUNNEL, ANTHILL]):
+                        stepsToReachTunnel = min(stepsToReachTunnel, stepsToReach(currentState, (x, y), constr.coords))
+
+                    verticleArray.append((stepsToReachFood, stepsToReachTunnel))
+
+                self.stepsToReachMap.append(verticleArray)
+
+        #for x in range(0, 10):
+            #for y in range (0, 10):
+                #print "Coord(", x, ",", y, "): ", self.stepsToReachMap[x][y]
+
+        initNode = Node(None, currentState, None, 0.5)
+        bestNode = self.bestMove(initNode, self.playerId, 0)
+        return bestNode.move
 
     ##
     #getAttack
@@ -246,8 +259,6 @@ class AIPlayer(Player):
         currentScore = 50
 
         # Find our inventory and enemies inventory
-        ourInventory = None
-        enemyInventory = None
         if gameState.inventories[PLAYER_ONE].player == self.playerId:
             ourInventory = gameState.inventories[PLAYER_ONE]
             enemyInventory = gameState.inventories[PLAYER_TWO]
@@ -262,15 +273,13 @@ class AIPlayer(Player):
             if ant.type == WORKER:
                 if ant.carrying:
                     # want to get to tunnel
-                    distanceFromDest = 1000
-                    for dropOff in foodDropOffs:
-                        distanceFromDest = min(distanceFromDest, stepsToReach(gameState, ant.coords, dropOff.coords))
+                    distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
+                    distanceFromDest = distanceTouple[1]
                     currentScore += 10 - distanceFromDest
                 else:
                     # want to get to food
-                    distanceFromDest = 1000
-                    for pickUp in foodPickUps:
-                        distanceFromDest = min(distanceFromDest, stepsToReach(gameState, ant.coords, pickUp.coords))
+                    distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
+                    distanceFromDest = distanceTouple[0]
                     currentScore += 10 - distanceFromDest
             elif ant.type == QUEEN:
                 for dropOff in foodDropOffs:
@@ -305,25 +314,6 @@ class AIPlayer(Player):
         return currentScore
 
 
-    def testEvaluateState(self, gameState):
-        currentScore = 0.5
-
-        # Find our inventory and enemies inventory
-        ourInventory = None
-        enemyInventory = None
-        if gameState.inventories[PLAYER_ONE].player == self.playerId:
-            ourInventory = gameState.inventories[PLAYER_ONE]
-            enemyInventory = gameState.inventories[PLAYER_TWO]
-        else:
-            ourInventory = gameState.inventories[PLAYER_TWO]
-            enemyInventory = gameState.inventories[PLAYER_ONE]
-
-        if ourInventory.foodCount > enemyInventory.foodCount:
-            currentScore += .25
-        elif enemyInventory.foodCount > ourInventory.foodCount:
-            currentScore -= .25
-
-
     def evaluateNodeList(self, nodeList):
         score = 0
         for node in nodeList:
@@ -341,7 +331,7 @@ class AIPlayer(Player):
         legalMoves = listAllLegalMoves(currentNode.state)
         childList = []
         for move in legalMoves:
-            childState = self.processMove(move)
+            childState = self.processMove(currentNode.state, move)
             childList.append(Node(move, childState, currentNode, self.evaluateState(childState)))
 
         # Recursive Step
@@ -367,33 +357,33 @@ class AIPlayer(Player):
 ##################################
 
 # Create a GameState object
-antArray1 = [Ant((5,5), WORKER, PLAYER_ONE), Ant((1,1), QUEEN, PLAYER_ONE)]
-antArray2 = [Ant((8,8), QUEEN, PLAYER_TWO)]
-
-constrArray1 = [Construction((1,1), ANTHILL)]
-constrArray2 = [Construction((8,8), ANTHILL)]
-constrArray3 = [Construction((5,7), FOOD), Construction((4,4), FOOD)]
-
-inventory1 = Inventory(PLAYER_ONE, antArray1, constrArray1, 0)
-inventory2 = Inventory(PLAYER_TWO, antArray2, constrArray2, 0)
-inventory3 = Inventory(NEUTRAL, None, constrArray3, 0)
-inventories = [inventory1, inventory2, inventory3]
-
-stubState = GameState(None, inventories, PLAY_PHASE, PLAYER_ONE)
-
-# Create a Move object
-stubMove = Move(MOVE_ANT, [(5,5),(5,6),(5,7)], None)
-
-# Process the move
-testAIPlayer = AIPlayer(PLAYER_ONE)
-testProcessedState = testAIPlayer.processMove(stubState, stubMove)
-
-# Test that the ant moves correctly
-if testProcessedState.inventories[0].ants[0].coords != (5,7):
-    print "Resulting state after processMove was incorrect."
-else:
-    # Evaluate the state
-    if testAIPlayer.evaluateState(testProcessedState) != 0.5:
-        print "Evaluation of state was incorrect."
-    else:
-        print "Sigelmann_Underwood Search Unit Test #1 Passed"
+# antArray1 = [Ant((5,5), WORKER, PLAYER_ONE), Ant((1,1), QUEEN, PLAYER_ONE)]
+# antArray2 = [Ant((8,8), QUEEN, PLAYER_TWO)]
+#
+# constrArray1 = [Construction((1,1), ANTHILL)]
+# constrArray2 = [Construction((8,8), ANTHILL)]
+# constrArray3 = [Construction((5,7), FOOD), Construction((4,4), FOOD)]
+#
+# inventory1 = Inventory(PLAYER_ONE, antArray1, constrArray1, 0)
+# inventory2 = Inventory(PLAYER_TWO, antArray2, constrArray2, 0)
+# inventory3 = Inventory(NEUTRAL, None, constrArray3, 0)
+# inventories = [inventory1, inventory2, inventory3]
+#
+# stubState = GameState(None, inventories, PLAY_PHASE, PLAYER_ONE)
+#
+# # Create a Move object
+# stubMove = Move(MOVE_ANT, [(5,5),(5,6),(5,7)], None)
+#
+# # Process the move
+# testAIPlayer = AIPlayer(PLAYER_ONE)
+# testProcessedState = testAIPlayer.processMove(stubState, stubMove)
+#
+# # Test that the ant moves correctly
+# if testProcessedState.inventories[0].ants[0].coords != (5,7):
+#     print "Resulting state after processMove was incorrect."
+# else:
+#     # Evaluate the state
+#     if testAIPlayer.evaluateState(testProcessedState) != 0.5:
+#         print "Evaluation of state was incorrect."
+#     else:
+#         print "Sigelmann_Underwood Search Unit Test #1 Passed"
