@@ -7,7 +7,6 @@ from Construction import Construction
 from Ant import Ant
 from GameState import GameState
 from AIPlayerUtils import *
-from Node import *
 
 
 ##
@@ -98,7 +97,7 @@ class AIPlayer(Player):
     ##
     def getMove(self, currentState):
 
-        # initialize mapping of steps to reach for workers
+        # initialize mapping of steps to reach
         if self.stepsToReachMap == []:
             for x in range(0, 10):
                 verticleArray = []
@@ -113,13 +112,13 @@ class AIPlayer(Player):
                     for constr in getConstrList(currentState, self.playerId, [TUNNEL, ANTHILL]):
                         stepsToReachTunnel = min(stepsToReachTunnel, stepsToReach(currentState, (x, y), constr.coords))
 
-                    verticleArray.append((stepsToReachFood, stepsToReachTunnel))
+                    # find the steps to reach for the opponent's anthill
+                    opponentHill = getConstrList(currentState, (self.playerId+1)%2, [ANTHILL])[0]
+                    stepsToReachOpponentHill = stepsToReach(currentState, (x,y), opponentHill.coords)
+                    verticleArray.append((stepsToReachFood, stepsToReachTunnel, stepsToReachOpponentHill))
 
                 self.stepsToReachMap.append(verticleArray)
 
-        #for x in range(0, 10):
-            #for y in range (0, 10):
-                #print "Coord(", x, ",", y, "): ", self.stepsToReachMap[x][y]
 
         initNode = Node(None, currentState, None, 0.5)
         bestNode = self.bestMove(initNode, self.playerId, 0)
@@ -275,12 +274,12 @@ class AIPlayer(Player):
                     # want to get to tunnel
                     distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
                     distanceFromDest = distanceTouple[1]
-                    currentScore += 10 - distanceFromDest
+                    currentScore += 25 - distanceFromDest
                 else:
                     # want to get to food
                     distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
                     distanceFromDest = distanceTouple[0]
-                    currentScore += 10 - distanceFromDest
+                    currentScore += 25 - distanceFromDest
             elif ant.type == QUEEN:
                 for dropOff in foodDropOffs:
                     if ant.coords == dropOff.coords:
@@ -288,13 +287,52 @@ class AIPlayer(Player):
                 for pickUp in foodPickUps:
                     if ant.coords == pickUp.coords:
                         currentScore -= 10
+                # get the queen as far from the enemey anthill as possible
+                distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
+                distanceFromEnemyHill = distanceTouple[2]
+                currentScore += distanceFromEnemyHill
+            elif ant.type == DRONE:
+                # want to get to the opponent's tunnel
+                distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
+                distanceFromHill = distanceTouple[2]
+                currentScore += 25 - distanceFromHill
+
+        # Incentivize lowering the total health of the opponent's ants
+        enemyHealth = 0
+        queenHealth = 0
+        for ant in enemyInventory.ants:
+            if ant.type == QUEEN:
+                queenHealth += 5 * ant.health
+            else:
+                enemyHealth += ant.health
+
+        currentScore -= queenHealth
+        currentScore -= enemyHealth
 
         # make sure we don't get too many workers
-        if len(ourInventory.ants) > 3:
-            currentScore -= 30
+        numWorkers = len(getAntList(gameState, self.playerId, [WORKER]))
+        if numWorkers > 2:
+            currentScore -= 30 * numWorkers
+
+        # make sure we don't get too many drones
+        numDrones = len(getAntList(gameState, self.playerId, [DRONE]))
+        if numDrones > 2:
+            currentScore -= 30 * numDrones
+
+        # make sure we don't build any other ants
+        numOtherAnts = len(getAntList(gameState, self.playerId, [SOLDIER, R_SOLDIER]))
+        if numOtherAnts > 0:
+            currentScore -= 30 * numOtherAnts
+
+        # incentivize gaining food
+        currentScore += ourInventory.foodCount
+
+        # incentivize capturing anthill
+        enemyHill = getConstrList(gameState, enemyInventory.player, [ANTHILL])[0]
+        currentScore -= 3 * enemyHill.captureHealth
 
         # make sure our return value is between 0 and 1
-        currentScore = currentScore / 100.0
+        currentScore = currentScore / 200.0
         if currentScore > 1.0:
             currentScore = 1.0
         elif currentScore < 0.0:
@@ -303,7 +341,7 @@ class AIPlayer(Player):
         # check win conditions
         if ourInventory.foodCount > 10:
             currentScore = 1.0
-        if getConstrList(gameState, enemyInventory.player, [ANTHILL])[0] == 0:
+        if enemyHill.captureHealth == 0:
             currentScore = 1.0
         isQueenDead = True
         for ant in enemyInventory.ants:
@@ -323,8 +361,8 @@ class AIPlayer(Player):
 
 
     def bestMove(self, currentNode, playerId, currentDepth):
-        # Base Case: at depth limit
-        if currentDepth > self.depthLimit:
+        # Base Case: at depth limit or winning move found
+        if currentDepth > self.depthLimit or currentNode.evaluation == 1.0:
             return currentNode
 
         # Create a node for each state that can be reached from the current state
@@ -334,10 +372,22 @@ class AIPlayer(Player):
             childState = self.processMove(currentNode.state, move)
             childList.append(Node(move, childState, currentNode, self.evaluateState(childState)))
 
-        # Recursive Step
-        currentBestScore = -1.0
-        currentBestNode = childList[0]
+        # Create a dictionary to hold the nodes and their scores
+        nodeDictionary = {}
         for node in childList:
+            key = node.evaluation
+            if not nodeDictionary.has_key(key):
+                nodeDictionary[key] = []
+            nodeDictionary[key].append(node)
+
+        # Find the best score in the dictionary
+        bestScore = max(nodeDictionary)
+
+        # Recursive Step
+        # Only look at nodes that have the max score and return the best option
+        currentBestScore = -1.0
+        currentBestNode = nodeDictionary[bestScore][0]
+        for node in nodeDictionary[bestScore]:
             nextNode = self.bestMove(node, playerId, currentDepth + 1)
             if nextNode != node:
                 node.evaluation = self.evaluateNodeList([nextNode, node])
@@ -348,42 +398,10 @@ class AIPlayer(Player):
         return currentBestNode
 
 
+class Node(object):
 
-
-
-
-##################################
-# Unit Test
-##################################
-
-# Create a GameState object
-# antArray1 = [Ant((5,5), WORKER, PLAYER_ONE), Ant((1,1), QUEEN, PLAYER_ONE)]
-# antArray2 = [Ant((8,8), QUEEN, PLAYER_TWO)]
-#
-# constrArray1 = [Construction((1,1), ANTHILL)]
-# constrArray2 = [Construction((8,8), ANTHILL)]
-# constrArray3 = [Construction((5,7), FOOD), Construction((4,4), FOOD)]
-#
-# inventory1 = Inventory(PLAYER_ONE, antArray1, constrArray1, 0)
-# inventory2 = Inventory(PLAYER_TWO, antArray2, constrArray2, 0)
-# inventory3 = Inventory(NEUTRAL, None, constrArray3, 0)
-# inventories = [inventory1, inventory2, inventory3]
-#
-# stubState = GameState(None, inventories, PLAY_PHASE, PLAYER_ONE)
-#
-# # Create a Move object
-# stubMove = Move(MOVE_ANT, [(5,5),(5,6),(5,7)], None)
-#
-# # Process the move
-# testAIPlayer = AIPlayer(PLAYER_ONE)
-# testProcessedState = testAIPlayer.processMove(stubState, stubMove)
-#
-# # Test that the ant moves correctly
-# if testProcessedState.inventories[0].ants[0].coords != (5,7):
-#     print "Resulting state after processMove was incorrect."
-# else:
-#     # Evaluate the state
-#     if testAIPlayer.evaluateState(testProcessedState) != 0.5:
-#         print "Evaluation of state was incorrect."
-#     else:
-#         print "Sigelmann_Underwood Search Unit Test #1 Passed"
+    def __init__(self, initMove, potentialState, initParentNode, initEvaluation):
+        self.move = initMove
+        self.state = potentialState
+        self.parentNode = initParentNode
+        self.evaluation = initEvaluation
