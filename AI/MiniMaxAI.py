@@ -183,6 +183,7 @@ class AIPlayer(Player):
                 if ant.coords == startCoord:
                     # update the ant's coords
                     ant.coords = finalCoord
+                    ant.hasMoved = True
 
                     #handle possible attacks, for now attack first that is eligible
                     for enemy in clonedState.inventories[playerId-1].ants:
@@ -253,8 +254,6 @@ class AIPlayer(Player):
     #
     # Returns: a Double indicating how good the state is
     def evaluateState(self, gameState):
-        currentScore = 50
-
         # Find our inventory and enemies inventory
         if gameState.inventories[PLAYER_ONE].player == self.playerId:
             ourInventory = gameState.inventories[PLAYER_ONE]
@@ -262,6 +261,21 @@ class AIPlayer(Player):
         else:
             ourInventory = gameState.inventories[PLAYER_TWO]
             enemyInventory = gameState.inventories[PLAYER_ONE]
+
+        # Variables for determining the score with a linear equation
+        workerScore = 0.0
+        workerToggleFood = 0.0
+        enemyQueenHealth = UNIT_STATS[QUEEN][HEALTH]
+        otherEnemyHealth = 20.0
+        droneScore = 0.0
+        queenScore = 0.0
+        numWorkersScore = 0.0
+        numDronesScore = 0.0
+        numOtherAntsScore = 0.0
+        enemyHillHealth = 0.0
+        foodCountScore = 0.0
+        queenNotObstructingScore = 0.0
+        totalEnemyMaxHealth = 0
 
         # Handle the score for workers
         foodDropOffs = getConstrList(gameState, self.playerId, [ANTHILL, TUNNEL])
@@ -271,88 +285,127 @@ class AIPlayer(Player):
                 if ant.carrying:
                     # want to get to tunnel
                     distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
+                    # get the steps to reach tunnel from the touple
                     distanceFromDest = distanceTouple[1]
-                    currentScore += 25 - distanceFromDest
+                    workerScore += 25.0 - distanceFromDest
                 else:
                     # want to get to food
                     distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
+                    # get the steps to reach food from the touple
                     distanceFromDest = distanceTouple[0]
-                    currentScore += 25 - distanceFromDest
+                    workerScore += 25.0 - distanceFromDest
+                if distanceFromDest == 0:
+                    # We are either picking up food or dropping it off
+                    workerToggleFood = 1.0
             elif ant.type == QUEEN:
+                queenNotObstructing = True
                 for dropOff in foodDropOffs:
                     if ant.coords == dropOff.coords:
-                        currentScore -= 10
+                        queenNotObstructing = False
                 for pickUp in foodPickUps:
                     if ant.coords == pickUp.coords:
-                        currentScore -= 10
-                # get the queen as far from the enemey anthill as possible
+                        queenNotObstructing = False
+                if queenNotObstructing:
+                    queenNotObstructingScore = 1.0
+                # get the queen as far from the enemy anthill as possible
                 distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
                 distanceFromEnemyHill = distanceTouple[2]
-                currentScore += distanceFromEnemyHill
+                queenScore += distanceFromEnemyHill
             elif ant.type == DRONE:
                 # want to get to the opponent's tunnel
                 distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
                 distanceFromHill = distanceTouple[2]
-                currentScore += 25 - distanceFromHill
+                droneScore += 25 - distanceFromHill
 
         # Incentivize lowering the total health of the opponent's ants
-        enemyHealth = 0
-        queenHealth = 0
         for ant in enemyInventory.ants:
             if ant.type == QUEEN:
-                queenHealth += 5 * ant.health
+                enemyQueenHealth -= ant.health
             else:
-                enemyHealth += ant.health
-
-        currentScore -= queenHealth
-        currentScore -= enemyHealth
+                otherEnemyHealth -= ant.health
 
         # make sure we don't get too many workers
         numWorkers = len(getAntList(gameState, self.playerId, [WORKER]))
         if numWorkers > 2:
-            currentScore -= 30 * numWorkers
+            numWorkersScore = 0.0
+        else:
+            numWorkersScore = 1.0
 
         # make sure we don't get too many drones
         numDrones = len(getAntList(gameState, self.playerId, [DRONE]))
         if numDrones > 2:
-            currentScore -= 30 * numDrones
+            numDronesScore = 0.0
+        else:
+            numDronesScore = 1.0
 
         # make sure we don't build any other ants
         numOtherAnts = len(getAntList(gameState, self.playerId, [SOLDIER, R_SOLDIER]))
         if numOtherAnts > 0:
-            currentScore -= 30 * numOtherAnts
+            numOtherAntsScore = 0.0
+        else:
+            numOtherAntsScore = 1.0
 
         # incentivize gaining food
-        currentScore += ourInventory.foodCount
+        foodCountScore = ourInventory.foodCount
 
         # incentivize capturing anthill
         enemyHill = getConstrList(gameState, enemyInventory.player, [ANTHILL])[0]
-        currentScore -= 3 * enemyHill.captureHealth
+        enemyHillHealth = CONSTR_STATS[ANTHILL][CAP_HEALTH] - enemyHill.captureHealth
+
+        # Normalize scores for linear equation
+        workerScore /= 50.0
+        queenNotObstructingScore /= 1.0
+        queenScore /= 30.0
+        droneScore /= 50.0
+        enemyQueenHealth /= 4.0
+        otherEnemyHealth /= 20.0
+        numWorkersScore /= 1.0
+        numDronesScore /= 1.0
+        numOtherAntsScore /= 1.0
+        foodCountScore /= 11.0
+        workerToggleFood /= 1.0
+        enemyHillHealth /= CONSTR_STATS[ANTHILL][CAP_HEALTH]
+
+        evaluation = 0.02 * workerScore + \
+                     0.01 * queenNotObstructingScore + \
+                     0.01 * queenScore + \
+                     0.01 * droneScore + \
+                     0.25 * enemyQueenHealth + \
+                     0.05 * otherEnemyHealth + \
+                     0.17 * numWorkersScore + \
+                     0.17 * numDronesScore + \
+                     0.05 * numOtherAntsScore + \
+                     0.15 * foodCountScore + \
+                     0.01 * enemyHillHealth + \
+                     0.1 * workerToggleFood
 
         # make sure our return value is between 0 and 1
-        currentScore = currentScore / 200.0
-        if currentScore > 1.0:
-            currentScore = 1.0
-        elif currentScore < 0.0:
-            currentScore = 0.0
+        if evaluation > 1.0:
+            evaluation = 1.0
+        elif evaluation < 0.0:
+            evaluation = 0.0
 
         # check win conditions
         if ourInventory.foodCount > 10:
-            currentScore = 1.0
+            evaluation = 1.0
         if enemyHill.captureHealth == 0:
-            currentScore = 1.0
+            evaluation = 1.0
         isQueenDead = True
         for ant in enemyInventory.ants:
-            if ant.type == QUEEN:
+            if ant.type == QUEEN and ant.health > 0:
                 isQueenDead = False
         if isQueenDead:
-            currentScore = 1.0
-        return currentScore
+            evaluation = 1.0
+
+        return evaluation
 
 
     def evaluateNodeList(self, nodeList, playerId):
         min = 1
         max = 0
+        if len(nodeList) == 0:
+            print "ERROR: evaluateNodeList called with empty list"
+        bestNode = nodeList[0]
         if playerId == self.playerId:
             for node in nodeList:
                 if node.evaluation > max:
