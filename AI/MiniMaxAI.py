@@ -28,7 +28,7 @@ class AIPlayer(Player):
     ##
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "Sigelmann_Olivar MiniMax")
-        self.depthLimit = 2
+        self.depthLimit = 3
         self.PRUNED = 1234
         self.stepsToReachMap = []
 
@@ -211,6 +211,7 @@ class AIPlayer(Player):
                             if finalCoords == constr.coords:
                                 ant.carrying = False
                                 clonedState.inventories[playerId].foodCount += 1
+            clonedState.whoseTurn = (clonedState.whoseTurn + 1) % 2
 
         # set all ants to having not moved for the recursion
         #for ant in clonedState.inventories[playerId].ants:
@@ -333,7 +334,7 @@ class AIPlayer(Player):
 
         # make sure we don't get too many drones
         numDrones = len(getAntList(gameState, self.playerId, [DRONE]))
-        if numDrones > 2:
+        if numDrones > 1:
             numDronesScore = 0.0
         else:
             numDronesScore = 1.0
@@ -354,9 +355,11 @@ class AIPlayer(Player):
 
         # Normalize scores for linear equation
         workerScore /= 50.0
+        if workerScore > 1.0:
+            workerScore = 1.0
         queenNotObstructingScore /= 1.0
         queenScore /= 30.0
-        droneScore /= 50.0
+        droneScore /= 25.0
         enemyQueenHealth /= 4.0
         otherEnemyHealth /= 20.0
         numWorkersScore /= 1.0
@@ -366,18 +369,22 @@ class AIPlayer(Player):
         workerToggleFood /= 1.0
         enemyHillHealth /= CONSTR_STATS[ANTHILL][CAP_HEALTH]
 
-        evaluation = 0.02 * workerScore + \
-                     0.01 * queenNotObstructingScore + \
-                     0.01 * queenScore + \
-                     0.01 * droneScore + \
-                     0.25 * enemyQueenHealth + \
-                     0.05 * otherEnemyHealth + \
-                     0.17 * numWorkersScore + \
-                     0.17 * numDronesScore + \
-                     0.05 * numOtherAntsScore + \
-                     0.15 * foodCountScore + \
-                     0.01 * enemyHillHealth + \
-                     0.1 * workerToggleFood
+        evaluation = 0.15 * workerScore + \
+                     0.25 * workerToggleFood + \
+                     0.25 * foodCountScore + \
+                     0.1 * queenScore + \
+                     0.25 * numWorkersScore
+                     # 0.01 * queenNotObstructingScore + \
+
+                     # 0.01 * droneScore + \
+                     # 0.25 * enemyQueenHealth + \
+                     # 0.05 * otherEnemyHealth + \
+
+                     # 0.15 * numDronesScore + \
+                     # 0.05 * numOtherAntsScore + \
+
+
+                     # 0.01 * enemyHillHealth + \
 
         # make sure our return value is between 0 and 1
         if evaluation > 1.0:
@@ -458,13 +465,17 @@ class AIPlayer(Player):
         # Only look at nodes that have the max score and return the best option
         # for node in nodeDictionary[bestScore]:
         for node in childList:
+            # if currentDepth == 0 and node.move.moveType == END:
+            #     # print "END TURN"
             if node.move.moveType == END:
                 nextNode = self.bestMove(node, (playerId+1) % 2, currentDepth + 1)
                 if nextNode == self.PRUNED:
+                    print "Node pruned"
                     continue
             else:
                 nextNode = self.bestMove(node, playerId, currentDepth + 1)
                 if nextNode == self.PRUNED:
+                    print "Node pruned"
                     continue
             if nextNode != node:
                 node.evaluation = nextNode.evaluation
