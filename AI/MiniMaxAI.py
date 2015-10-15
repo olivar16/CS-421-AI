@@ -8,6 +8,15 @@ from Ant import Ant
 from GameState import GameState
 from AIPlayerUtils import *
 
+# infinity
+INFINITY = 9999
+                
+# establishing weights for the weighted linear equation
+queenSafetyWeight = 0.3
+
+# "max" values for determining how good a state is
+maxNumAnts = 98.0 # 100 square minus 2 queens
+maxDist = 18.0
 
 ##
 #AIPlayer
@@ -29,8 +38,6 @@ class AIPlayer(Player):
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "Sigelmann_Olivar MiniMax")
         self.depthLimit = 3
-        self.PRUNED = 1234
-        self.stepsToReachMap = []
 
     ##
     #getPlacement
@@ -97,34 +104,49 @@ class AIPlayer(Player):
     #Return: The Move to be made
     ##
     def getMove(self, currentState):
-
-        # initialize mapping of steps to reach
-        if self.stepsToReachMap == []:
-            for x in range(0, 10):
-                verticleArray = []
-                for y in range(0, 10):
-                    # find the lowest steps to reach for food
-                    stepsToReachFood = 999 # arbitrarily large number
-                    for food in getConstrList(currentState, None, [FOOD]):
-                        stepsToReachFood = min(stepsToReachFood, stepsToReach(currentState, (x, y), food.coords))
-
-                    # find the lowest steps to reach for tunnel or anthill
-                    stepsToReachTunnel = 999
-                    for constr in getConstrList(currentState, self.playerId, [TUNNEL, ANTHILL]):
-                        stepsToReachTunnel = min(stepsToReachTunnel, stepsToReach(currentState, (x, y), constr.coords))
-
-                    # find the steps to reach for the opponent's anthill
-                    opponentHill = getConstrList(currentState, (self.playerId+1)%2, [ANTHILL])[0]
-                    stepsToReachOpponentHill = stepsToReach(currentState, (x,y), opponentHill.coords)
-                    verticleArray.append((stepsToReachFood, stepsToReachTunnel, stepsToReachOpponentHill))
-
-                self.stepsToReachMap.append(verticleArray)
-
-
         initNode = Node(None, currentState, None)
         bestNode = self.bestMove(initNode, self.playerId, 0)
         return bestNode.move
-
+        
+    ##
+    # vectorDistance
+    # Description: Given two cartesian coordinates, determines the 
+    #   manhattan distance between them (assuming all moves cost 1)
+    #
+    # Parameters:
+    #   self - The object pointer
+    #   pos1 - The first position
+    #   pos2 - The second position
+    #
+    # Return: The manhattan distance
+    #
+    def vectorDistance(self, pos1, pos2):
+        return (abs(pos1[0] - pos2[0]) +
+                    abs(pos1[1] - pos2[1]))
+        
+    ##
+    # distClosestAnt
+    # Description: Determines the distance between a cartesian coordinate
+    #   and the coordinates of the enemy ant closest to it.
+    #
+    # Parameters:
+    #   self - The object pointer
+    #   currentState - The state to analyze
+    #   initialCoords - The positition to check enemy ant distances from
+    #
+    # Return: The minimum distance between initialCoords and the closest
+    #           enemy ant.
+    #
+    def distClosestAnt(self, currentState, initialCoords):
+        # get a list of the enemy player's ants
+        closestAntDist = 999
+        for ant in currentState.inventories[(currentState.whoseTurn+1)%2].ants:
+            tempAntDist = self.vectorDistance(ant.coords, initialCoords)
+            if tempAntDist < closestAntDist:
+                closestAntDist = tempAntDist
+        return closestAntDist
+        
+        
     ##
     #getAttack
     #Description: Gets the attack to be made from the Player
@@ -244,6 +266,16 @@ class AIPlayer(Player):
         else:
             return False
 
+
+    def hasWon(self, currentState, playerId):
+        myInventory = currentState.inventories[playerId]
+        enemyInventory = currentState.inventories[(playerId+1) % 2]
+        if enemyInventory.getQueen() is None:
+            return True
+        if myInventory.foodCount >= 11:
+            return True
+        return False
+
     ##
     # evaluateState
     #
@@ -254,175 +286,99 @@ class AIPlayer(Player):
     #   gameState - the GameState to be evaluated
     #
     # Returns: a Double indicating how good the state is
-    def evaluateState(self, gameState):
-        # Find our inventory and enemies inventory
-        if gameState.inventories[PLAYER_ONE].player == self.playerId:
-            ourInventory = gameState.inventories[PLAYER_ONE]
-            enemyInventory = gameState.inventories[PLAYER_TWO]
-        else:
-            ourInventory = gameState.inventories[PLAYER_TWO]
-            enemyInventory = gameState.inventories[PLAYER_ONE]
-
-        # Variables for determining the score with a linear equation
-        workerScore = 0.0
-        workerToggleFood = 0.0
-        enemyQueenHealth = UNIT_STATS[QUEEN][HEALTH]
-        otherEnemyHealth = 20.0
-        droneScore = 0.0
-        queenScore = 0.0
-        numWorkersScore = 0.0
-        numDronesScore = 0.0
-        numOtherAntsScore = 0.0
-        enemyHillHealth = 0.0
-        foodCountScore = 0.0
-        queenNotObstructingScore = 0.0
-        totalEnemyMaxHealth = 0
-
-        # Handle the score for workers
-        foodDropOffs = getConstrList(gameState, self.playerId, [ANTHILL, TUNNEL])
-        foodPickUps = getConstrList(gameState, None, [FOOD])
-        for ant in ourInventory.ants:
-            if ant.type == WORKER:
-                if ant.carrying:
-                    # want to get to tunnel
-                    distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
-                    # get the steps to reach tunnel from the touple
-                    distanceFromDest = distanceTouple[1]
-                    workerScore += 25.0 - distanceFromDest
-                else:
-                    # want to get to food
-                    distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
-                    # get the steps to reach food from the touple
-                    distanceFromDest = distanceTouple[0]
-                    workerScore += 25.0 - distanceFromDest
-                if distanceFromDest == 0:
-                    # We are either picking up food or dropping it off
-                    workerToggleFood = 1.0
-            elif ant.type == QUEEN:
-                queenNotObstructing = True
-                for dropOff in foodDropOffs:
-                    if ant.coords == dropOff.coords:
-                        queenNotObstructing = False
-                for pickUp in foodPickUps:
-                    if ant.coords == pickUp.coords:
-                        queenNotObstructing = False
-                if queenNotObstructing:
-                    queenNotObstructingScore = 1.0
-                # get the queen as far from the enemy anthill as possible
-                distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
-                distanceFromEnemyHill = distanceTouple[2]
-                queenScore += distanceFromEnemyHill
-            elif ant.type == DRONE:
-                # want to get to the opponent's tunnel
-                distanceTouple = self.stepsToReachMap[ant.coords[0]][ant.coords[1]]
-                distanceFromHill = distanceTouple[2]
-                droneScore += 25 - distanceFromHill
-
-        # Incentivize lowering the total health of the opponent's ants
-        for ant in enemyInventory.ants:
+    def evaluateState(self, currentState):
+        # get a reference to the player's inventory
+        playerInv = currentState.inventories[currentState.whoseTurn]
+        # get a reference to the enemy player's inventory
+        enemyInv = currentState.inventories[(currentState.whoseTurn+1) % 2]
+        # get a reference to the enemy's queen
+        enemyQueen = enemyInv.getQueen()
+        
+        # game over (lost) if player does not have a queen
+        #               or if enemy player has 11 or more food
+        if playerInv.getQueen() is None or enemyInv.foodCount >= 11:
+            return 0.0
+        # game over (win) if enemy player does not have a queen
+        #              or if player has 11 or more food
+        if enemyQueen is None or playerInv.foodCount >= 11:
+            return 1.0
+        
+        # initial state value is neutral ( no player is winning or losing )
+        valueOfState = 0.5        
+            
+        # hurting the enemy queen is a very good state to be in
+        valueOfState += 0.025 * (UNIT_STATS[QUEEN][HEALTH] - enemyQueen.health)
+        
+        # keeps track of the number of ants the player has besides the queen
+        numAttackAnts = 0
+        enemyDistFromQueen = maxDist
+        
+        # loop through the player's ants and handle rewards or punishments
+        # based on whether they are workers or attackers
+        for ant in playerInv.ants:
             if ant.type == QUEEN:
-                enemyQueenHealth -= ant.health
+                enemyDistFromQueen = self.distClosestAnt(currentState, ant.coords)
+                queenSafety = enemyDistFromQueen / maxDist
+                valueOfState += queenSafety * queenSafetyWeight
             else:
-                otherEnemyHealth -= ant.health
+                numAttackAnts += 1
+                # Punish the AI less and less as its ants approach the enemy's queen
+                valueOfState -= 0.005 * self.vectorDistance(ant.coords, enemyQueen.coords)
 
-        # make sure we don't get too many workers
-        numWorkers = len(getAntList(gameState, self.playerId, [WORKER]))
-        if numWorkers > 2:
-            numWorkersScore = 0.0
-        else:
-            numWorkersScore = 1.0
-
-        # make sure we don't get too many drones
-        numDrones = len(getAntList(gameState, self.playerId, [DRONE]))
-        if numDrones > 1:
-            numDronesScore = 0.0
-        else:
-            numDronesScore = 1.0
-
-        # make sure we don't build any other ants
-        numOtherAnts = len(getAntList(gameState, self.playerId, [SOLDIER, R_SOLDIER]))
-        if numOtherAnts > 0:
-            numOtherAntsScore = 0.0
-        else:
-            numOtherAntsScore = 1.0
-
-        # incentivize gaining food
-        foodCountScore = ourInventory.foodCount
-
-        # incentivize capturing anthill
-        enemyHill = getConstrList(gameState, enemyInventory.player, [ANTHILL])[0]
-        enemyHillHealth = CONSTR_STATS[ANTHILL][CAP_HEALTH] - enemyHill.captureHealth
-
-        # Normalize scores for linear equation
-        workerScore /= 50.0
-        if workerScore > 1.0:
-            workerScore = 1.0
-        queenNotObstructingScore /= 1.0
-        queenScore /= 30.0
-        droneScore /= 25.0
-        enemyQueenHealth /= 4.0
-        otherEnemyHealth /= 20.0
-        numWorkersScore /= 1.0
-        numDronesScore /= 1.0
-        numOtherAntsScore /= 1.0
-        foodCountScore /= 11.0
-        workerToggleFood /= 1.0
-        enemyHillHealth /= CONSTR_STATS[ANTHILL][CAP_HEALTH]
-
-        evaluation = 0.15 * workerScore + \
-                     0.25 * workerToggleFood + \
-                     0.25 * foodCountScore + \
-                     0.1 * queenScore + \
-                     0.25 * numWorkersScore
-                     # 0.01 * queenNotObstructingScore + \
-
-                     # 0.01 * droneScore + \
-                     # 0.25 * enemyQueenHealth + \
-                     # 0.05 * otherEnemyHealth + \
-
-                     # 0.15 * numDronesScore + \
-                     # 0.05 * numOtherAntsScore + \
-
-
-                     # 0.01 * enemyHillHealth + \
-
-        # make sure our return value is between 0 and 1
-        if evaluation > 1.0:
-            evaluation = 1.0
-        elif evaluation < 0.0:
-            evaluation = 0.0
-
-        # check win conditions
-        if ourInventory.foodCount > 10:
-            evaluation = 1.0
-        if enemyHill.captureHealth == 0:
-            evaluation = 1.0
-        isQueenDead = True
-        for ant in enemyInventory.ants:
-            if ant.type == QUEEN and ant.health > 0:
-                isQueenDead = False
-        if isQueenDead:
-            evaluation = 1.0
-
-        return evaluation
+        # punish AI for having no attack ants
+        if numAttackAnts == 0:
+            valueOfState -= 0.2
+            
+        # ensure that 0.0 is a loss and 1.0 is a win ONLY
+        if valueOfState < 0.0:
+            valueOfState = 0.001 + (valueOfState * 0.0001)
+        if valueOfState > 1.0:
+            valueOfState = 0.999
+            
+        # return the value of the currentState
+        # Value if our turn, otherwise 1-value if opponents turn
+        # Doing 1-value is the equivalent of looking at the min value
+        # since it is the best move for the opponent, and therefore the worst move
+        # for our AI
+        if currentState.whoseTurn == self.playerId:
+            return valueOfState
+        return 1-valueOfState
 
 
     def evaluateNodeList(self, nodeList, playerId):
-        min = 1
-        max = 0
         if len(nodeList) == 0:
             print "ERROR: evaluateNodeList called with empty list"
-        bestNode = nodeList[0]
+
+        nodeDictionary = {}
+        for node in nodeList:
+            key = node.evaluation
+            if not nodeDictionary.has_key(key):
+                nodeDictionary[key] = []
+            nodeDictionary[key].append(node)
+
         if playerId == self.playerId:
-            for node in nodeList:
-                if node.evaluation > max:
-                    max = node.evaluation
-                    bestNode = node
+            bestNodes = nodeDictionary[max(nodeDictionary.keys())]
         else:
-            for node in nodeList:
-                if node.evaluation < min:
-                    min = node.evaluation
+            bestNodes = nodeDictionary[min(nodeDictionary.keys())]
+
+        numTies = len(bestNodes)
+        if numTies == 0:
+            print "ERROR: No best node found"
+        elif numTies == 1:
+            bestNode = bestNodes[0]
+        else:
+            # Resolve ties by evaluating the state again. This should prioritize winning moves immediately.
+            minimum = 1
+            maximum = 0
+            for node in bestNodes:
+                evaluation = self.evaluateState(node.state)
+                if playerId == self.playerId and evaluation > maximum:
+                    maximum = evaluation
                     bestNode = node
+                elif playerId != self.playerId and evaluation < minimum:
+                    minimum = evaluation
+                    bestNode = node
+
         return bestNode
 
 
@@ -430,17 +386,6 @@ class AIPlayer(Player):
         # Base Case: at depth limit or winning move found
         if currentDepth >= self.depthLimit:
             currentNode.evaluation = self.evaluateState(currentNode.state)
-            parentNode = currentNode.parentNode
-            # Update parent node values for minimax
-            if parentNode.state.whoseTurn == self.playerId:
-                # Parent was a max node, so update its range accordingly
-                if currentNode.evaluation >= parentNode.min and currentNode.evaluation <= parentNode.max:
-                    parentNode.min = currentNode.evaluation
-            else:
-                # Parent was a min node
-                if currentNode.evaluation >= parentNode.min and currentNode.evaluation <= parentNode.max:
-                    parentNode.max = currentNode.evaluation
-
             return currentNode
 
         # Create a node for each state that can be reached from the current state
@@ -450,57 +395,50 @@ class AIPlayer(Player):
             childState = self.processMove(currentNode.state, move, playerId)
             childList.append(Node(move, childState, currentNode))
 
-        # Create a dictionary to hold the nodes and their scores
-        # nodeDictionary = {}
-        # for node in childList:
-        #     key = node.evaluation
-        #     if not nodeDictionary.has_key(key):
-        #         nodeDictionary[key] = []
-        #     nodeDictionary[key].append(node)
-
-        # Find the best score in the dictionary
-        # bestScore = max(nodeDictionary)
-
         # Recursive Step
-        # Only look at nodes that have the max score and return the best option
-        # for node in nodeDictionary[bestScore]:
         for node in childList:
-            # if currentDepth == 0 and node.move.moveType == END:
-            #     # print "END TURN"
+
+            # Make sure winning moves are taken immediately
+            if self.hasWon(node.state, playerId):
+                currentNode.evaluation = node.evaluation
+                return node
+
+            # If the move type is end turn, then the next move will be for the opponent
             if node.move.moveType == END:
                 nextNode = self.bestMove(node, (playerId+1) % 2, currentDepth + 1)
-                if nextNode == self.PRUNED:
-                    print "Node pruned"
+                if nextNode is None:
                     continue
             else:
                 nextNode = self.bestMove(node, playerId, currentDepth + 1)
-                if nextNode == self.PRUNED:
-                    print "Node pruned"
+                if nextNode is None:
                     continue
-            if nextNode != node:
-                node.evaluation = nextNode.evaluation
-                # Update parent node values for minimax
-                if currentNode.state.whoseTurn == self.playerId:
-                    # Parent was a max node, so update its range accordingly
-                    if node.evaluation >= currentNode.min and node.evaluation <= currentNode.max:
-                        currentNode.min = node.evaluation
-                else:
-                    # Parent was a min node
-                    if node.evaluation >= currentNode.min and node.evaluation <= currentNode.max:
-                        currentNode.max = node.evaluation
-            grandparentNode = currentNode.parentNode
-            if grandparentNode is None:
-                continue
-            if grandparentNode.state.whoseTurn == self.playerId:
-                if currentNode.max <= grandparentNode.min:
-                    # prune
-                    return self.PRUNED
-            else:
-                if currentNode.min >= grandparentNode.max:
-                    return self.PRUNED
 
-        # return self.evaluateNodeList(nodeDictionary[bestScore], playerId)
-        return self.evaluateNodeList(childList, playerId)
+            # Update parent node values for minimax
+            if currentNode.state.whoseTurn == self.playerId:
+                # Current node is a max node, so update its range accordingly
+                if node.evaluation >= currentNode.min and node.evaluation <= currentNode.max:
+                    currentNode.min = node.evaluation
+            else:
+                # Current node is a min node
+                if node.evaluation >= currentNode.min and node.evaluation <= currentNode.max:
+                    currentNode.max = node.evaluation
+
+            # Check if the new bounds make it so we can be pruned
+            parentNode = currentNode.parentNode
+            if parentNode is None:
+                continue
+            if parentNode.state.whoseTurn == self.playerId:
+                # parent was a max node
+                if currentNode.max <= parentNode.min:
+                    return None
+            else:
+                # parent was a min node
+                if currentNode.min >= parentNode.max:
+                    return None
+
+        bestChildNode = self.evaluateNodeList(childList, playerId)
+        currentNode.evaluation = bestChildNode.evaluation
+        return bestChildNode
 
 
 class Node(object):
@@ -509,6 +447,6 @@ class Node(object):
         self.move = initMove
         self.state = potentialState
         self.parentNode = initParentNode
-        self.evaluation = 0.5
+        self.evaluation = None
         self.min = 0.0
         self.max = 1.0
