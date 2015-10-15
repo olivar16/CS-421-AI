@@ -1,5 +1,9 @@
 __author__ = 'Paul Olivar and Casey Sigelmann'
 
+##
+# Parts of the eval function were from Bryce Matsuda
+##
+
 from Building import Building
 from Inventory import Inventory
 from Player import *
@@ -7,15 +11,11 @@ from Construction import Construction
 from Ant import Ant
 from GameState import GameState
 from AIPlayerUtils import *
-
-# infinity
-INFINITY = 9999
                 
 # establishing weights for the weighted linear equation
 queenSafetyWeight = 0.3
 
 # "max" values for determining how good a state is
-maxNumAnts = 98.0 # 100 square minus 2 queens
 maxDist = 18.0
 
 ##
@@ -267,6 +267,16 @@ class AIPlayer(Player):
             return False
 
 
+    ##
+    # hasWon
+    # Description: Returns whether the given state results in a win for the given player
+    #
+    # Parameters:
+    #   currentState - the state to be evaluated
+    #   playerId - the current player
+    #
+    # Returns: True if the player won
+    ##
     def hasWon(self, currentState, playerId):
         myInventory = currentState.inventories[playerId]
         enemyInventory = currentState.inventories[(playerId+1) % 2]
@@ -345,6 +355,16 @@ class AIPlayer(Player):
         return 1-valueOfState
 
 
+    ##
+    # evaluateNodeList
+    # Description: Decides which node is best from a list of nodes
+    #
+    # Parameters:
+    #   nodelist: the list of nodes to be evaluated
+    #   playerId: the current player
+    #
+    # Returns: a node that is the best from the list
+    ##
     def evaluateNodeList(self, nodeList, playerId):
         if len(nodeList) == 0:
             print "ERROR: evaluateNodeList called with empty list"
@@ -382,6 +402,17 @@ class AIPlayer(Player):
         return bestNode
 
 
+    ##
+    # bestMove
+    # Description: Recursively gets the best child node for the given node
+    #
+    # Parameters:
+    #   currentNode - the node to be expanded
+    #   playerId - the current player
+    #   currentDepth - how many recursions have occurred
+    #
+    # Returns: a node that is a child of the current node with the best evaluation
+    ##
     def bestMove(self, currentNode, playerId, currentDepth):
         # Base Case: at depth limit or winning move found
         if currentDepth >= self.depthLimit:
