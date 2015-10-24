@@ -30,6 +30,7 @@ class AIPlayer(Player):
     #    inputPlayerId - The id to give the new player (int)
     # # 
     def __init__(self, inputPlayerId):
+        print "NEW AIPLAYER INSTANTIATED"
         super(AIPlayer,self).__init__(inputPlayerId, "HeuristicAI")
         self.genes = []
         self.index = 0
@@ -50,7 +51,6 @@ class AIPlayer(Player):
     # Return: The coordinates of where the construction is to be placed
     # # 
     def getPlacement(self, currentState):
-        self.initializePopulation(currentState)
         numToPlace = 0
         # implemented by students to return their next move
         if currentState.phase == SETUP_PHASE_1:    # stuff on my side
@@ -82,16 +82,16 @@ class AIPlayer(Player):
             return [(0, 0)]
 
 
-        # #
+    # #
     # initializePopulation
     # Description: Initializes the population of genes with random values and reset
     #              the fitness list to default values
     # Parameters:
     #    currentState - The state of the current game waiting for the player's move (GameState)
     #
-    # Return: The Move to be made
+    # Return: None
     # #
-    def initializePopulation(self, currentState):
+    def initializePopulation(self):
         #Start with N=10 genes
         numGenes = 10
 
@@ -103,10 +103,10 @@ class AIPlayer(Player):
 
             gene = []
             for j in range(0, numCells):
-                #set x values
+                # set x values
                 if j < 13:
                     gene.append(random.randrange(0, 9))
-                #set y values
+                # set y values
                 else:
                     if j == 24 or j == 25:
                         gene.append(random.randrange(6, 9))
@@ -119,6 +119,44 @@ class AIPlayer(Player):
             #Initialize fitness of each gene to 0
             self.geneFitnessList.append(0)
 
+    # #
+    # evaluateFitness
+    # Description: Evaluates the fitness of a gene based on distance of game objects from borders
+    #
+    # Parameters:
+    #    gene - The list of coordinates to be evaluated
+    #
+    # Return: The evaluation score of the gene
+    # #
+    def evaluateFitness(self, gene):
+
+        evalScore = 0
+
+        yCoords = range(13, 26)
+
+        #Evaluate closeness of grass to the border
+
+
+
+    # #
+    # mate
+    # Description: Mates two parent genes and returns a child gene
+    # Parameters:
+    #    parentOne - First gene to mate
+    #    parentTwo - Second gene to mate
+    #
+    # Return: the child gene that's a result of mating
+    # #
+    def mate(self, parentOne, parentTwo):
+
+        child = []
+
+        # Random pivot point to slice the gene for mating
+        pivot = random.randrange(0, 26)
+        print "pivot selected at " + str(pivot)
+        childOne = parentOne[0:pivot] + parentTwo[pivot:26]
+        childTwo = parentTwo[0:pivot] + parentOne[pivot:26]
+        return [childOne, childTwo]
 
     # # 
     # getMove
@@ -478,4 +516,20 @@ class AIPlayer(Player):
                 if isPathOkForQueen(move.coordList):
                     return move
 
+    # def registerWin(self, hasWon):
 
+
+#UNIT TEST
+player = AIPlayer(PLAYER_ONE)
+
+print "Initializing population"
+player.initializePopulation()
+
+testParentOne = [4, 3, 8, 2, 7, 1, 8, 7, 3, 8, 0, 8, 2, 2, 0, 2, 2, 0, 1, 2, 0, 1, 1, 1, 8, 6]
+testParentTwo = [0, 6, 0, 2, 2, 7, 5, 5, 6, 5, 7, 7, 4, 0, 2, 2, 1, 2, 0, 2, 0, 1, 1, 2, 6, 8]
+
+print "\n Mating population"
+print "parentOne: " + str(testParentOne)
+print "parentTwo: " + str(testParentTwo)
+children = player.mate(testParentOne, testParentTwo)
+print "Children: " + str(children)
