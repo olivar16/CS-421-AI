@@ -464,7 +464,6 @@ class AIPlayer(Player):
             self.stateEval = stateEval
                
 #UNIT TEST
-print "TEST CASE #1"
 #Prepare a demo board to build gameState
 p1Inventory = Inventory(PLAYER_ONE, [], [], 0)
 p2Inventory = Inventory(PLAYER_TWO, [], [], 0)

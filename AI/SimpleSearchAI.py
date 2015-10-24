@@ -323,12 +323,3 @@ stubMove = Move(MOVE_ANT, [(5,5),(5,6),(5,7)], None)
 testAIPlayer = AIPlayer(PLAYER_ONE)
 testProcessedState = testAIPlayer.processMove(stubState, stubMove)
 
-# Test that the ant moves correctly
-if testProcessedState.inventories[0].ants[0].coords != (5,7):
-    print "Resulting state after processMove was incorrect."
-else:
-    # Evaluate the state
-    if testAIPlayer.evaluateState(testProcessedState) != 0.5:
-        print "Evaluation of state was incorrect."
-    else:
-        print "Sigelmann_Underwood Search Unit Test #1 Passed"

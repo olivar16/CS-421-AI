@@ -1,4 +1,4 @@
-
+__author__ = 'Max Robinsom and Casey Sigelmann'
 
 from Player import *
 
@@ -30,10 +30,7 @@ class AIPlayer(Player):
     #    inputPlayerId - The id to give the new player (int)
     # # 
     def __init__(self, inputPlayerId):
-        super(AIPlayer,self).__init__(inputPlayerId, "HeuristicAI")
-        self.genes = []
-        self.index = 0
-        self.geneFitnessList = []
+        super(AIPlayer,self).__init__(inputPlayerId, "HeuristicAI copy")
 
     # # 
     # getPlacement
@@ -50,7 +47,6 @@ class AIPlayer(Player):
     # Return: The coordinates of where the construction is to be placed
     # # 
     def getPlacement(self, currentState):
-        self.initializePopulation(currentState)
         numToPlace = 0
         # implemented by students to return their next move
         if currentState.phase == SETUP_PHASE_1:    # stuff on my side
@@ -61,7 +57,7 @@ class AIPlayer(Player):
             antTunelMove = (7,1)
             locations.append(antHillMove)
             locations.append(antTunelMove)
-
+            
             numToPlace = 9
             for i in range(0, numToPlace):
                 move = (i,3)
@@ -80,45 +76,6 @@ class AIPlayer(Player):
 
         else:
             return [(0, 0)]
-
-
-        # #
-    # initializePopulation
-    # Description: Initializes the population of genes with random values and reset
-    #              the fitness list to default values
-    # Parameters:
-    #    currentState - The state of the current game waiting for the player's move (GameState)
-    #
-    # Return: The Move to be made
-    # #
-    def initializePopulation(self, currentState):
-        #Start with N=10 genes
-        numGenes = 10
-
-        #Cells representing x and y coordinates of each object
-        numCells = 26
-
-        #Create N random genes
-        for i in range(0,numGenes):
-
-            gene = []
-            for j in range(0, numCells):
-                #set x values
-                if j < 13:
-                    gene.append(random.randrange(0, 9))
-                #set y values
-                else:
-                    if j == 24 or j == 25:
-                        gene.append(random.randrange(6, 9))
-                    else:
-                        gene.append(random.randrange(0, 3))
-            self.genes.append(gene)
-
-            print "Gene " + str(i) + ":" + str(gene)
-
-            #Initialize fitness of each gene to 0
-            self.geneFitnessList.append(0)
-
 
     # # 
     # getMove
