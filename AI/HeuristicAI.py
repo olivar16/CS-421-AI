@@ -35,6 +35,8 @@ class AIPlayer(Player):
         self.genes = []
         self.index = 0
         self.geneFitnessList = []
+        self.generations = 0
+
 
     # # 
     # getPlacement
@@ -52,34 +54,84 @@ class AIPlayer(Player):
     # # 
     def getPlacement(self, currentState):
         numToPlace = 0
-        # implemented by students to return their next move
-        if currentState.phase == SETUP_PHASE_1:    # stuff on my side
-            locations = []
-            
-            #  place ant hills
-            antHillMove = (2,1)
-            antTunelMove = (7,1)
-            locations.append(antHillMove)
-            locations.append(antTunelMove)
 
-            numToPlace = 9
-            for i in range(0, numToPlace):
-                move = (i,3)
-                currentState.board[i][3].constr == True
-                locations.append(move)
-            return locations
+        #current gene
+        currentGene = self.genes[self.index]
+
+        locations = []
+
+        matrix = []
+
+        for i in range(0, 4):
+            matrix.append([0,0,0,0,0,0,0,0,0,0])
+
+
+        #Ensure no duplicates
+        #Anthill, tunnel and grass duplicate check
+        for i in range(0, 11):
+            while(matrix[currentGene[i]][currentGene[i+13]] == 1):
+                if currentGene[i] == 9 and currentGene[i+13] == 3:
+                    currentGene[i] = 0
+                    currentGene[i+13] = 0
+                elif currentGene[i] == 9:
+                    currentGene[i] = 0
+                    currentGene[i+13] += 1
+
+            matrix[currentGene[i]][currentGene[i+13]] = 1
+
+
+                # implemented by students to return their next move
+        if currentState.phase == SETUP_PHASE_1:
+
+
+             #  place ant hills
+
+             numToPlace = 9
+             for i in range(0, 11):
+                 move = (currentGene[i],currentGene[i+13])
+                 locations.append(move)
+
+             return locations
 
         elif currentState.phase == SETUP_PHASE_2:   # stuff on foe's side
-            # set opponent id
-            opponentId = PLAYER_ONE
-            if self.playerId is PLAYER_ONE:
-                opponentId = PLAYER_TWO
+             # set opponent id
+             locations.append((currentGene[11], currentGene[24]))
+             locations.append((currentGene[12], currentGene[25]))
 
-            locations = self.findFurthestSpacesForFood(currentState, opponentId)
-            return locations
+             return locations
 
         else:
-            return [(0, 0)]
+             return [(0, 0)]
+
+
+        # implemented by students to return their next move
+        # if currentState.phase == SETUP_PHASE_1:    # stuff on my side
+        #     locations = []
+        #
+        #     #  place ant hills
+        #     antHillMove = (2,1)
+        #     antTunelMove = (7,1)
+        #     locations.append(antHillMove)
+        #     locations.append(antTunelMove)
+        #
+        #     numToPlace = 9
+        #     for i in range(0, numToPlace):
+        #         move = (i,3)
+        #         currentState.board[i][3].constr == True
+        #         locations.append(move)
+        #     return locations
+        #
+        # elif currentState.phase == SETUP_PHASE_2:   # stuff on foe's side
+        #     # set opponent id
+        #     opponentId = PLAYER_ONE
+        #     if self.playerId is PLAYER_ONE:
+        #         opponentId = PLAYER_TWO
+        #
+        #     locations = self.findFurthestSpacesForFood(currentState, opponentId)
+        #     return locations
+        #
+        # else:
+        #     return [(0, 0)]
 
 
     # #
@@ -132,11 +184,23 @@ class AIPlayer(Player):
 
         evalScore = 0
 
-        yCoords = range(13, 26)
+        xVals = gene[0:13]
+        yVals = gene[13:26]
+
+        #Evaluate distance between anthill and tunnel
+        hillScore = abs(xVal[0] - xVal[1]) + abs(yVal[0] - yVal[1])
+
+        #Evaluate food's closeness to the border
+        foodScore = (9 - yVal[24]) + (9 - yVal[25])
 
         #Evaluate closeness of grass to the border
+        grassScore=0
 
+        for i in range(15, 24):
+            grassScore+=yVal[i]
 
+        evalScore = hillScore + foodScore + grassScore
+        return evalScore
 
     # #
     # mate
@@ -156,7 +220,61 @@ class AIPlayer(Player):
         print "pivot selected at " + str(pivot)
         childOne = parentOne[0:pivot] + parentTwo[pivot:26]
         childTwo = parentTwo[0:pivot] + parentOne[pivot:26]
+
+        randNum = random.randrange(0,26)
+
+        if randNum==24 or randNum==25:
+            childOne[randNum] = random.randrange(6,10)
+        elif randNum in range(13,24):
+            childOne[randNum] = random.randrange(0,4)
+        else:
+            childOne[randNum] = random.randrange(0,11)
+
+        randNumTwo = random.randrange(0,26)
+        if randNumTwo==24 or randNumTwo==25:
+            childTwo[randNumTwo] = random.randrange(6,10)
+        elif randNum in range(13,24):
+            childTwo[randNumTwo] = random.randrange(0,4)
+        else:
+            childTwo[randNumTwo] = random.randrange(0,11)
+
         return [childOne, childTwo]
+
+    # #
+    # mate
+    # Description: Generates new population to test
+    # Parameters:
+    #    genes - instance variable
+    #
+    # Return: list containing the mated genes
+    # #
+    def generateNextPopulation(self):
+
+
+        fitnessTuple = zip(self.geneFitnessList, self.genes)
+        fitnessTuple.sort(reverse=True)
+        sortedList = [x for y, x in fitnessTuple]
+
+        lenSortedList = len(sortedList)
+
+        parentList = sortedList[0, (lenSortedList / 2) + (lenSortedList % 2)]
+
+        lenParentList = len(parentList)
+
+        nextPopulation = []
+
+        for i in range(0, lenParentList):
+            randNum1 = random.randrange(0, lenParentList)
+            randNum2 = random.randrange(0, lenParentList)
+            while randNum1 == randNum2:
+                randNum2 = random.randrange(0, lenParentList)
+
+            children = mate(parentList[randNum1], parentList[randNum2])
+
+            nextPopulation.append(children[0])
+            nextPopulation.append(children[1])
+
+        return nextPopulation
 
     # # 
     # getMove
@@ -515,8 +633,32 @@ class AIPlayer(Player):
                 # not on anything we don't valid move.
                 if isPathOkForQueen(move.coordList):
                     return move
+    # #
+    # registerWin
+    #
+    # Description: Helper method to get the opponent's Id
+    #
+    # Parameters:
+    #   None
+    #
+    # Return: Which player the opponent is.
+    # #
+    def registerWin(self, hasWon):
+         if hasWon:
+             self.geneFitnessList[self.index] += 6
 
-    # def registerWin(self, hasWon):
+
+
+         if self.index == len(self.genes)-1:
+             self.generations+=1
+             if self.generations == 20:
+
+            self.genes = self.generateNextPopulation()
+            self.index = 0
+
+
+
+
 
 
 #UNIT TEST
