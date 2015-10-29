@@ -1,4 +1,4 @@
-__author__ = 'Max Robinsom and Casey Sigelmann'
+
 
 from Player import *
 
@@ -30,7 +30,15 @@ class AIPlayer(Player):
     #    inputPlayerId - The id to give the new player (int)
     # # 
     def __init__(self, inputPlayerId):
-        super(AIPlayer,self).__init__(inputPlayerId, "HeuristicAI copy")
+        print "NEW AIPLAYER INSTANTIATED"
+        super(AIPlayer,self).__init__(inputPlayerId, "HeuristiCopy")
+        self.genes = []
+        self.index = 0
+        self.geneFitnessList = []
+        self.generations = 0
+        self.initializePopulation()
+        self.firstMove = True
+
 
     # # 
     # getPlacement
@@ -48,34 +56,240 @@ class AIPlayer(Player):
     # # 
     def getPlacement(self, currentState):
         numToPlace = 0
-        # implemented by students to return their next move
-        if currentState.phase == SETUP_PHASE_1:    # stuff on my side
-            locations = []
-            
-            #  place ant hills
-            antHillMove = (2,1)
-            antTunelMove = (7,1)
-            locations.append(antHillMove)
-            locations.append(antTunelMove)
-            
-            numToPlace = 9
-            for i in range(0, numToPlace):
-                move = (i,3)
-                currentState.board[i][3].constr == True
-                locations.append(move)
-            return locations
+
+        #current gene
+        currentGene = self.genes[self.index]
+
+        locations = []
+
+        matrix = []
+
+        for i in range(0, 4):
+            matrix.append([0,0,0,0,0,0,0,0,0,0])
+
+
+        #Ensure no duplicates
+        #Anthill, tunnel and grass duplicate check
+        for i in range(0, 11):
+            while(matrix[currentGene[i+13]][currentGene[i]] == 1):
+                if currentGene[i] == 9 and currentGene[i+13] == 3:
+                    currentGene[i] = 0
+                    currentGene[i+13] = 0
+                elif currentGene[i] == 9:
+                    currentGene[i] = 0
+                    currentGene[i+13] += 1
+                else:
+                    currentGene[i] +=1
+
+            matrix[currentGene[i+13]][currentGene[i]] = 1
+
+
+                # implemented by students to return their next move
+        if currentState.phase == SETUP_PHASE_1:
+
+
+             #  place ant hills
+
+             numToPlace = 9
+             for i in range(0, 11):
+                 move = (currentGene[i],currentGene[i+13])
+                 locations.append(move)
+             return locations
 
         elif currentState.phase == SETUP_PHASE_2:   # stuff on foe's side
-            # set opponent id
-            opponentId = PLAYER_ONE
-            if self.playerId is PLAYER_ONE:
-                opponentId = PLAYER_TWO
 
-            locations = self.findFurthestSpacesForFood(currentState, opponentId)
+            for i in range(11, 13):
+                while getConstrAt(currentState, (currentGene[i], currentGene[i+13])) is not None or (currentGene[11]==currentGene[12] and currentGene[24]== currentGene[25]):
+                    if currentGene[i] == 9 and currentGene[i+13] == 3:
+                        currentGene[i] = 0
+                        currentGene[i+13] = 0
+                    elif currentGene[i] == 9:
+                        currentGene[i] = 0
+                        currentGene[i+13] += 1
+                    else:
+                        currentGene[i] +=1
+
+             # set opponent id
+            locations.append((currentGene[11], currentGene[24]))
+            locations.append((currentGene[12], currentGene[25]))
+
             return locations
 
         else:
-            return [(0, 0)]
+             return [(0, 0)]
+
+
+        # implemented by students to return their next move
+        # if currentState.phase == SETUP_PHASE_1:    # stuff on my side
+        #     locations = []
+        #
+        #     #  place ant hills
+        #     antHillMove = (2,1)
+        #     antTunelMove = (7,1)
+        #     locations.append(antHillMove)
+        #     locations.append(antTunelMove)
+        #
+        #     numToPlace = 9
+        #     for i in range(0, numToPlace):
+        #         move = (i,3)
+        #         currentState.board[i][3].constr == True
+        #         locations.append(move)
+        #     return locations
+        #
+        # elif currentState.phase == SETUP_PHASE_2:   # stuff on foe's side
+        #     # set opponent id
+        #     opponentId = PLAYER_ONE
+        #     if self.playerId is PLAYER_ONE:
+        #         opponentId = PLAYER_TWO
+        #
+        #     locations = self.findFurthestSpacesForFood(currentState, opponentId)
+        #     return locations
+        #
+        # else:
+        #     return [(0, 0)]
+
+
+    # #
+    # initializePopulation
+    # Description: Initializes the population of genes with random values and reset
+    #              the fitness list to default values
+    # Parameters:
+    #    currentState - The state of the current game waiting for the player's move (GameState)
+    #
+    # Return: None
+    # #
+    def initializePopulation(self):
+        #Start with N=10 genes
+        numGenes = 100
+
+        #Cells representing x and y coordinates of each object
+        numCells = 26
+
+        #Create N random genes
+        for i in range(0,numGenes):
+
+            gene = []
+            for j in range(0, numCells):
+                # set x values
+                if j < 13:
+                    gene.append(random.randrange(0, 9))
+                # set y values
+                else:
+                    if j == 24 or j == 25:
+                        gene.append(random.randrange(6, 9))
+                    else:
+                        gene.append(random.randrange(0, 3))
+            self.genes.append(gene)
+
+            print "Gene " + str(i) + ":" + str(gene)
+
+            #Initialize fitness of each gene to 0
+            self.geneFitnessList.append(0)
+
+    # #
+    # evaluateFitness
+    # Description: Evaluates the fitness of a gene based on distance of game objects from borders
+    #
+    # Parameters:
+    #    gene - The list of coordinates to be evaluated
+    #
+    # Return: The evaluation score of the gene
+    # #
+    def evaluateFitness(self, gene):
+
+        evalScore = 0
+
+        xVals = gene[0:13]
+        yVals = gene[13:26]
+
+        #Evaluate distance between anthill and tunnel
+        hillScore = abs(xVals[0] - xVals[1]) + abs(yVals[0] - yVals[1])
+
+        #Evaluate food's closeness to the border
+        foodScore = (9 - yVals[11]) + (9 - yVals[12])
+
+        #Evaluate closeness of grass to the border
+        grassScore=0
+
+        for i in range(2, 11):
+            grassScore+=yVals[i]
+
+        evalScore = hillScore + foodScore + grassScore
+        return evalScore
+
+    # #
+    # mate
+    # Description: Mates two parent genes and returns a child gene
+    # Parameters:
+    #    parentOne - First gene to mate
+    #    parentTwo - Second gene to mate
+    #
+    # Return: the child gene that's a result of mating
+    # #
+    def mate(self, parentOne, parentTwo):
+
+        child = []
+
+        # Random pivot point to slice the gene for mating
+        pivot = random.randrange(0, 26)
+        print "pivot selected at " + str(pivot)
+        childOne = parentOne[0:pivot] + parentTwo[pivot:26]
+        childTwo = parentTwo[0:pivot] + parentOne[pivot:26]
+
+        randNum = random.randrange(0,26)
+
+        if randNum==24 or randNum==25:
+            childOne[randNum] = random.randrange(6,10)
+        elif randNum in range(13,24):
+            childOne[randNum] = random.randrange(0,4)
+        else:
+            childOne[randNum] = random.randrange(0,11)
+
+        randNumTwo = random.randrange(0,26)
+        if randNumTwo==24 or randNumTwo==25:
+            childTwo[randNumTwo] = random.randrange(6,10)
+        elif randNum in range(13,24):
+            childTwo[randNumTwo] = random.randrange(0,4)
+        else:
+            childTwo[randNumTwo] = random.randrange(0,11)
+
+        return [childOne, childTwo]
+
+    # #
+    # mate
+    # Description: Generates new population to test
+    # Parameters:
+    #    genes - instance variable
+    #
+    # Return: list containing the mated genes
+    # #
+    def generateNextPopulation(self):
+
+
+        fitnessTuple = zip(self.geneFitnessList, self.genes)
+        fitnessTuple.sort(reverse=True)
+        sortedList = [x for y, x in fitnessTuple]
+
+        lenSortedList = len(sortedList)
+
+        parentList = sortedList[0, (lenSortedList / 2) + (lenSortedList % 2)]
+
+        lenParentList = len(parentList)
+
+        nextPopulation = []
+
+        for i in range(0, lenParentList):
+            randNum1 = random.randrange(0, lenParentList)
+            randNum2 = random.randrange(0, lenParentList)
+            while randNum1 == randNum2:
+                randNum2 = random.randrange(0, lenParentList)
+
+            children = mate(parentList[randNum1], parentList[randNum2])
+
+            nextPopulation.append(children[0])
+            nextPopulation.append(children[1])
+
+        return nextPopulation
 
     # # 
     # getMove
@@ -90,6 +304,17 @@ class AIPlayer(Player):
         # moves = listAllLegalMoves(currentState)
         # get food coords
         # foodList = self.findFood(currentState)
+
+        if self.firstMove == True:
+            asciiPrintState(currentState)
+            self.firstMove = False
+            # file = open("evidence.txt", "a")
+            # asciiPrintState(currentState) >> file
+            # file.close
+
+
+
+
         foodConstrList = getConstrList(currentState, None, [FOOD])
         foodCoordList = []
         for food in foodConstrList:
@@ -435,4 +660,47 @@ class AIPlayer(Player):
                 if isPathOkForQueen(move.coordList):
                     return move
 
+    ##
+    #registerWin
+    #Description: Tells the player if they won or not
+    #
+    #Parameters:
+    #   hasWon - True if the player won the game. False if they lost (Boolean)
+    #
+    def registerWin(self, hasWon):
 
+
+         if hasWon:
+             print "WON"
+             self.geneFitnessList[self.index] += self.evaluateFitness(self.genes[self.index])
+
+
+         self.firstMove = True
+
+         if self.index == len(self.genes)-1:
+             self.generations+=1
+             #if self.generations == 20:
+             self.genes = self.generateNextPopulation()
+             self.index = 0
+
+
+
+
+
+
+#UNIT TEST
+player = AIPlayer(PLAYER_ONE)
+
+#print "\n UNIT TEST:"
+
+#print "\n Initializing population"
+player.initializePopulation()
+
+testParentOne = [4, 3, 8, 2, 7, 1, 8, 7, 3, 8, 0, 8, 2, 2, 0, 2, 2, 0, 1, 2, 0, 1, 1, 1, 8, 6]
+testParentTwo = [0, 6, 0, 2, 2, 7, 5, 5, 6, 5, 7, 7, 4, 0, 2, 2, 1, 2, 0, 2, 0, 1, 1, 2, 6, 8]
+
+#print "\n Mating population"
+#print "parentOne: " + str(testParentOne)
+#print "parentTwo: " + str(testParentTwo)
+children = player.mate(testParentOne, testParentTwo)
+#print "Children: " + str(children)
