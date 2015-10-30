@@ -30,8 +30,7 @@ class AIPlayer(Player):
     #    inputPlayerId - The id to give the new player (int)
     # # 
     def __init__(self, inputPlayerId):
-        print "NEW AIPLAYER INSTANTIATED"
-        super(AIPlayer,self).__init__(inputPlayerId, "HeuristicAI")
+        super(AIPlayer,self).__init__(inputPlayerId, "Genetic AI")
         self.genes = []
         self.index = 0
         self.geneFitnessList = []
@@ -61,7 +60,6 @@ class AIPlayer(Player):
         #current gene
         currentGene = self.genes[self.index]
 
-        print "The size of currentGene is " + str(len(currentGene))
         currCoords = []
 
         locations = []
@@ -74,8 +72,6 @@ class AIPlayer(Player):
             if (currentGene[i],currentGene[i+13]) not in currCoords:
                 currCoords.append((currentGene[i],currentGene[i+13]))
             else:
-                print "curCoords is " + str(currCoords)
-                print "DUPLICATE FOUND at " + str((currentGene[i],currentGene[i+13]))
                 while (currentGene[i],currentGene[i+13]) in currCoords:
                     currentGene[i] = random.randint(0,9)
                     if i==11 or i==12:
@@ -92,8 +88,6 @@ class AIPlayer(Player):
              for i in range(0, 11):
                  move = (currentGene[i],currentGene[i+13])
                  locations.append(move)
-             print "anthill placed at " + str(locations[0])
-             print "tunnel placed at " + str(locations[1])
 
              return locations
 
@@ -121,35 +115,6 @@ class AIPlayer(Player):
         else:
              return [(0, 0)]
 
-
-        # implemented by students to return their next move
-        # if currentState.phase == SETUP_PHASE_1:    # stuff on my side
-        #     locations = []
-        #
-        #     #  place ant hills
-        #     antHillMove = (2,1)
-        #     antTunelMove = (7,1)
-        #     locations.append(antHillMove)
-        #     locations.append(antTunelMove)
-        #
-        #     numToPlace = 9
-        #     for i in range(0, numToPlace):
-        #         move = (i,3)
-        #         currentState.board[i][3].constr == True
-        #         locations.append(move)
-        #     return locations
-        #
-        # elif currentState.phase == SETUP_PHASE_2:   # stuff on foe's side
-        #     # set opponent id
-        #     opponentId = PLAYER_ONE
-        #     if self.playerId is PLAYER_ONE:
-        #         opponentId = PLAYER_TWO
-        #
-        #     locations = self.findFurthestSpacesForFood(currentState, opponentId)
-        #     return locations
-        #
-        # else:
-        #     return [(0, 0)]
 
 
     # #
@@ -181,7 +146,6 @@ class AIPlayer(Player):
                         gene.append(random.randrange(0, 3))
             self.genes.append(gene)
 
-            #print "Gene " + str(i) + ":" + str(gene)
 
             #Initialize fitness of each gene to 0
             self.geneFitnessList.append(0)
@@ -235,7 +199,6 @@ class AIPlayer(Player):
 
         # Random pivot point to slice the gene for mating
         pivot = random.randrange(0, 26)
-        print "pivot selected at " + str(pivot)
         childOne = parentOne[0:pivot] + parentTwo[pivot:26]
         childTwo = parentTwo[0:pivot] + parentOne[pivot:26]
         child.append(childOne)
@@ -258,25 +221,6 @@ class AIPlayer(Player):
 
 
 
-        #Random mutation
-        # randNum = random.randrange(0,26)
-        # print "randNum is " + str(randNum)
-        # if randNum==24 or randNum==25:
-        #     childOne[randNum] = random.randrange(6,10)
-        # elif randNum in range(13,24):
-        #     childOne[randNum] = random.randrange(0,4)
-        # else:
-        #     print "randNum is within range 0 to 12"
-        #     childOne[randNum] = random.randrange(0,11)
-        #
-        # randNumTwo = random.randrange(0,26)
-        # if randNumTwo==24 or randNumTwo==25:
-        #     childTwo[randNumTwo] = random.randrange(6,10)
-        # elif randNum in range(13,24):
-        #     childTwo[randNumTwo] = random.randrange(0,4)
-        # else:
-        #     childTwo[randNumTwo] = random.randrange(0,11)
-
         return [childOne, childTwo]
 
     # #
@@ -292,13 +236,11 @@ class AIPlayer(Player):
         nextPopulation = []
         fitnessTuple = zip(self.geneFitnessList, self.genes)
         fitnessTuple.sort(reverse=True)
-        print "fitnessTuple is " + str(fitnessTuple)
         sortedList=[]
         for element in fitnessTuple:
             #append the genes with the highest evaluation score
             sortedList.append(element[1])
         #sortedList = [x for y, x in fitnessTuple]
-        print "sorted list for next population is " + str(sortedList)
         lenSortedList = len(sortedList)
 
 
@@ -313,29 +255,7 @@ class AIPlayer(Player):
         if (lenSortedList%2 != 0):
             nextPopulation.append(sortedList[0])
 
-        print "The size of next population is now " + str(len(nextPopulation))
 
-
-
-
-
-        # parentList = sortedList[0:(lenSortedList / 2) + (lenSortedList % 2) + 1]
-        # #parentList = sortedList[0, (lenSortedList / 2) + (lenSortedList % 2)]
-        # print "parentList is " + str(parentList)
-        # lenParentList = len(parentList)
-        #
-        #
-        #
-        # for i in range(0, lenParentList):
-        #     randNum1 = random.randrange(0, lenParentList)
-        #     randNum2 = random.randrange(0, lenParentList)
-        #     while randNum1 == randNum2:
-        #         randNum2 = random.randrange(0, lenParentList)
-        #
-        #     children = self.mate(parentList[randNum1], parentList[randNum2])
-        #
-        #     nextPopulation.append(children[0])
-        #     nextPopulation.append(children[1])
 
         return nextPopulation
 
@@ -356,9 +276,7 @@ class AIPlayer(Player):
         if self.firstMove == True:
             asciiPrintState(currentState)
             self.firstMove = False
-            # file = open("evidence.txt", "a")
-            # asciiPrintState(currentState) >> file
-            # file.close
+
 
 
 
@@ -509,7 +427,6 @@ class AIPlayer(Player):
                     # if len(move.coordList) == 1 or (getConstrAt(currentState, move.coordList[1]) == None):
                     minDist = dist
                     finalMove = move
-        #print "final move made is " + str(finalMove)
         if len(finalMove.coordList) == 1:
             finalMove = movesList[random.randrange(0, len(movesList))]
         return finalMove
@@ -721,28 +638,22 @@ class AIPlayer(Player):
     #
     def registerWin(self, hasWon):
 
-         if hasWon:
-             print "WON"
 
          self.firstMove = True
          self.geneFitnessList[self.index] += self.evaluateFitness(self.genes[self.index])
 
-         print "Index: " + str(self.index)
-         print "size of genes is " + str(len(self.genes))
+
          if self.index == len(self.genes)-1:
              self.generations+=1
              #if self.generations == 20:
-             print "Generating next population"
              self.genes = self.generateNextPopulation()
              #self.geneFitnessList = []
              self.resetGeneFitness()
              self.index = 0
-             print "reached limit, index is now " + str(self.index)
          else:
              self.index+=1
 
     def resetGeneFitness(self):
-        print "Size of gene fitness to match is " + str(len(self.geneFitnessList))
         for i in range(0,self.numGenes):
             self.geneFitnessList[i] = 0
 
@@ -752,22 +663,11 @@ class AIPlayer(Player):
 
 
 
-#UNIT TEST
-#player = AIPlayer(PLAYER_ONE)
-
-#print "\n UNIT TEST:"
-
-#print "\n Initializing population"
-#player.initializePopulation()
 
 testParentOne = [4, 3, 8, 2, 7, 1, 8, 7, 3, 8, 0, 8, 2, 2, 0, 2, 2, 0, 1, 2, 0, 1, 1, 1, 8, 6]
 #testParentTwo = [0, 6, 0, 2, 2, 7, 5, 5, 6, 5, 7, 7, 4, 0, 2, 2, 1, 2, 0, 2, 0, 1, 1, 2, 6, 8]
 
-#print "\n Mating population"
-#print "parentOne: " + str(testParentOne)
-#print "parentTwo: " + str(testParentTwo)
-#children = player.mate(testParentOne, testParentTwo)
-#print "Children: " + str(children)
+
 
 currentGene = testParentOne
 
@@ -777,8 +677,6 @@ for i in range(0, 13):
     if (currentGene[i],currentGene[i+13]) not in currCoords:
         currCoords.append((currentGene[i],currentGene[i+13]))
     else:
-        print "curCoords is " + str(currCoords)
-        print "DUPLICATE FOUND at " + str((currentGene[i],currentGene[i+13]))
         while (currentGene[i],currentGene[i+13]) in currCoords:
             currentGene[i] = random.randint(0,9)
             if i==11 or i==12:
@@ -786,4 +684,3 @@ for i in range(0, 13):
             else:
                 currentGene[i+13] = random.randint(0,3)
         currCoords.append((currentGene[i],currentGene[i+13]))
-print "The final coord list is " + str(currCoords)
