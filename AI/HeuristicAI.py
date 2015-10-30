@@ -36,8 +36,10 @@ class AIPlayer(Player):
         self.index = 0
         self.geneFitnessList = []
         self.generations = 0
+        self.numGenes = 10
         self.initializePopulation()
         self.firstMove = True
+        self.population = 10
 
 
     # # 
@@ -161,13 +163,10 @@ class AIPlayer(Player):
     # #
     def initializePopulation(self):
         #Start with N=100 genes
-        numGenes = 5
-
         #Cells representing x and y coordinates of each object
         numCells = 26
-
         #Create N random genes
-        for i in range(0,numGenes):
+        for i in range(0, self.numGenes):
 
             gene = []
             for j in range(0, numCells):
@@ -186,6 +185,9 @@ class AIPlayer(Player):
 
             #Initialize fitness of each gene to 0
             self.geneFitnessList.append(0)
+
+
+
 
     # #
     # evaluateFitness
@@ -236,6 +238,25 @@ class AIPlayer(Player):
         print "pivot selected at " + str(pivot)
         childOne = parentOne[0:pivot] + parentTwo[pivot:26]
         childTwo = parentTwo[0:pivot] + parentOne[pivot:26]
+        child.append(childOne)
+        child.append(childTwo)
+
+        #30% chance of mutation
+        if random.randint(0, 10) < 3:
+            # Pick one child to mutate
+            childIndex = random.randint(0,1)
+            position = random.randrange(0, 26)
+                            # set x values
+            if position < 13:
+                child[childIndex][position] = random.randrange(0, 9)
+            # set y values
+            else:
+                if position == 24 or position == 25:
+                    child[childIndex][position] = random.randrange(6, 9)
+                else:
+                    child[childIndex][position] = random.randrange(0, 3)
+
+
 
         #Random mutation
         # randNum = random.randrange(0,26)
@@ -293,6 +314,10 @@ class AIPlayer(Player):
             nextPopulation.append(sortedList[0])
 
         print "The size of next population is now " + str(len(nextPopulation))
+
+
+
+
 
         # parentList = sortedList[0:(lenSortedList / 2) + (lenSortedList % 2) + 1]
         # #parentList = sortedList[0, (lenSortedList / 2) + (lenSortedList % 2)]
@@ -485,6 +510,8 @@ class AIPlayer(Player):
                     minDist = dist
                     finalMove = move
         #print "final move made is " + str(finalMove)
+        if len(finalMove.coordList) == 1:
+            finalMove = movesList[random.randrange(0, len(movesList))]
         return finalMove
 
     # #
@@ -694,15 +721,12 @@ class AIPlayer(Player):
     #
     def registerWin(self, hasWon):
 
-
-
          if hasWon:
              print "WON"
 
+         self.firstMove = True
          self.geneFitnessList[self.index] += self.evaluateFitness(self.genes[self.index])
 
-         self.firstMove = True
-         
          print "Index: " + str(self.index)
          print "size of genes is " + str(len(self.genes))
          if self.index == len(self.genes)-1:
@@ -710,10 +734,17 @@ class AIPlayer(Player):
              #if self.generations == 20:
              print "Generating next population"
              self.genes = self.generateNextPopulation()
+             #self.geneFitnessList = []
+             self.resetGeneFitness()
              self.index = 0
              print "reached limit, index is now " + str(self.index)
          else:
              self.index+=1
+
+    def resetGeneFitness(self):
+        print "Size of gene fitness to match is " + str(len(self.geneFitnessList))
+        for i in range(0,self.numGenes):
+            self.geneFitnessList[i] = 0
 
 
 
