@@ -32,8 +32,7 @@ class AIPlayer (Player):
     #   inputPlayerId - The id to give the new player (int)
     ##
     def __init__(self, inputPlayerId):
-        print "NEW AIPLAYER INSTANTIATED"
-        super(AIPlayer,self).__init__(inputPlayerId, "PaulGenetic")
+        super(AIPlayer,self).__init__(inputPlayerId, "olivar16pitassi17GeneticAI")
         self.genes = []
         self.index = 0
         self.geneFitnessList = []
@@ -223,23 +222,23 @@ class AIPlayer (Player):
         childTwo = parentTwo[0:pivot] + parentOne[pivot:26]
 
         #Random mutation
-        # randNum = random.randrange(0,26)
-        # print "randNum is " + str(randNum)
-        # if randNum==24 or randNum==25:
-        #     childOne[randNum] = random.randrange(6,10)
-        # elif randNum in range(13,24):
-        #     childOne[randNum] = random.randrange(0,4)
-        # else:
-        #     print "randNum is within range 0 to 12"
-        #     childOne[randNum] = random.randrange(0,11)
-        #
-        # randNumTwo = random.randrange(0,26)
-        # if randNumTwo==24 or randNumTwo==25:
-        #     childTwo[randNumTwo] = random.randrange(6,10)
-        # elif randNum in range(13,24):
-        #     childTwo[randNumTwo] = random.randrange(0,4)
-        # else:
-        #     childTwo[randNumTwo] = random.randrange(0,11)
+        randNum = random.randrange(0,26)
+        print "randNum is " + str(randNum)
+        if randNum==24 or randNum==25:
+            childOne[randNum] = random.randrange(6,10)
+        elif randNum in range(13,24):
+            childOne[randNum] = random.randrange(0,4)
+        else:
+            print "randNum is within range 0 to 12"
+            childOne[randNum] = random.randrange(0,11)
+        
+        randNumTwo = random.randrange(0,26)
+        if randNumTwo==24 or randNumTwo==25:
+            childTwo[randNumTwo] = random.randrange(6,10)
+        elif randNum in range(13,24):
+            childTwo[randNumTwo] = random.randrange(0,4)
+        else:
+            childTwo[randNumTwo] = random.randrange(0,11)
 
         return [childOne, childTwo]
 
