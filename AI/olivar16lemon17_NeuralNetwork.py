@@ -81,6 +81,8 @@ class AIPlayer(Player):
         #store outputs for each node
         self.outputs = [0,0,0,0,0,0]
 
+        self.hiddenNodeXValues = [0,0,0,0,0]
+
         print "inputToHiddenWeights is " + str(self.inputToHiddenWeights) + "with length:" + str(len(self.inputToHiddenWeights))
         print "hiddenWeightsToLastNode is " + str(self.hiddenWeightsToLastNode) + "with length:" + str(len(self.inputToHiddenWeights))
         print "biases is " + str(self.biases) + "with length " + str(len(self.biases))
@@ -192,6 +194,7 @@ class AIPlayer(Player):
         actualEval = self.neuralNetwork(resultingState)
         round(actualEval,2)
         print "Actual Eval is " + str(actualEval)
+        self.backPropagation(targetEval, actualEval)
         # n
         #backprop
         # store a reference to the parent of this node
@@ -213,7 +216,7 @@ class AIPlayer(Player):
         #Calculate the error term for the output node
         error = target - actual
         print "error is " + str(error)
-        lastErrorTerm = error*(outputs[5])*(1-outputs[5])
+        lastErrorTerm = error*(self.outputs[5])*(1-self.outputs[5])
 
         #Calculate the error for each hidden node
         hiddenWeightErrorTerms = []
@@ -232,7 +235,7 @@ class AIPlayer(Player):
         #Adjust each weight in the network
         for i in range(len(self.hiddenWeightsToLastNode)):
              oldWeight = self.hiddenWeightsToLastNode[i]
-             newWeight = oldWeight + learningRate*hiddenWeightErrorTerms[i]*self.inputToHiddenWeights[i]
+             newWeight = oldWeight + learningRate*hiddenWeightErrorTerms[i]* self.hiddenNodeXValues[i]
              self.hiddenWeightsToLastNode[i] = newWeight
 
 
@@ -585,6 +588,7 @@ class AIPlayer(Player):
             output += self.inputToHiddenWeights[1][i] * inputs[1]
             output += self.inputToHiddenWeights[2][i] * inputs[2]
            # self.outputs.append(output)
+            self.hiddenNodeXValues[i] = output
             denominator = 1 + math.exp(output*(-1.0))
             output = 1 / denominator
             self.outputs[i] = output
