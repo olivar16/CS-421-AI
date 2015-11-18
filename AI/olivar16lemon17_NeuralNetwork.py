@@ -189,12 +189,16 @@ class AIPlayer(Player):
         # set the value of the resulting state
         targetEval = self.evaluateState(resultingState)
         newNode["state_value"] = targetEval
-        print "target Eval is " + str(targetEval)
+        print "Target Eval: " + str(targetEval)
 
         actualEval = self.neuralNetwork(resultingState)
         round(actualEval,2)
-        print "Actual Eval is " + str(actualEval)
+        print "Actual Eval:" + str(actualEval)
+        print "Error: " + str(targetEval - actualEval)
+        print "Input to hidden weights: " + str(self.inputToHiddenWeights)
+        print "Hidden weights to last node: " + str(self.hiddenWeightsToLastNode)
         self.backPropagation(targetEval, actualEval)
+
         # n
         #backprop
         # store a reference to the parent of this node
@@ -215,7 +219,6 @@ class AIPlayer(Player):
     def backPropagation(self, target, actual):
         #Calculate the error term for the output node
         error = target - actual
-        print "error is " + str(error)
         lastErrorTerm = error*(self.outputs[5])*(1-self.outputs[5])
 
         #Calculate the error for each hidden node
@@ -598,7 +601,6 @@ class AIPlayer(Player):
         finalEval = 0.0
         #evaluate last layer
         for i in range(0, len(self.outputs)-1):
-            print "index is " + str(i)
             finalEval += self.outputs[i] * self.hiddenWeightsToLastNode[i]
 
         finalEval += self.biases[5][0]*self.biases[5][1]
