@@ -2,9 +2,9 @@
 
 ##
 # 
-# Homework 3
+# Homework 7
 #
-# Author(s): Caleb Piekstra, No Partner
+# Author(s): Paul Ryan Olivar, Nerissa Lemon
 #
 import random, time
 from Player import *
