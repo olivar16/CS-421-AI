@@ -42,7 +42,7 @@ treeNode = {
 
 ##
 #AIPlayer
-#Description: The responsibility of this class is to interact with the game by
+#Description: The responsbility of this class is to interact with the game by
 #deciding a valid move based on a given game state. This class has methods that
 #will be implemented by students in Dr. Nuxoll's AI course.
 #
@@ -60,13 +60,14 @@ class AIPlayer(Player):
     def __init__(self, inputPlayerId):
         # a depth limit for the search algorithm
         self.maxDepth = 3
+        # Agent_WillRobinson - Robinson, a man on a mission
+        super(AIPlayer,self).__init__(inputPlayerId, "RewardPunishmentsLearning")
 
-        super(AIPlayer,self).__init__(inputPlayerId, "olivar16lemon17_NeuralNetwork")
-
-        #weights of branches connecting input to hidden nodes
+        #matrix of input weights
         self.inputToHiddenWeights =  [[0.7844903510095795, 0.3736599936869134, 0.047239936174089725, 0.04525946251951318, 0.3557907732741893, 0.29230283060059314, 0.9805846894797967, 0.42652380903388765], [0.562480010062548, 0.07748975035672145, 0.34039302397869053, 0.43568482172403966, 0.7534773849091174, 0.25290167798570595, 0.6913716362437948, 0.8737773326420087], [0.5829026694812978, 0.3453476237064248, 0.12428003521878173, 0.1337314136574107, 0.7277867662631072, 0.5906577354805125, 0.7212539369580907, 0.4215866568579052], [0.35955735886811513, 0.4988524257829563, 0.30795014186323955, 0.26631133170182286, 0.27040456343061214, 0.4856724717351629, 0.9876559481876375, 0.8226317428353506]]
 
-        #weights of branches connecting hidden nodes and last node
+        #weights to last node
+
         self.hiddenWeightsToLastNode = [8.648073249165748e-40, 3.257954644140747e-18, 9.236259893423815e-41, 5.063521442521907e-06, 1.6446558633274638e-07, 9.882794086091683e-41, 0.0010919145079405694, 9.579201241566397e-40]
 
         #biases for each node. Array of tuples containing (input, weight)
@@ -80,7 +81,6 @@ class AIPlayer(Player):
         #store outputs for each node
         self.outputs = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-        #Inputs going into the hidden nodes
         self.hiddenNodeXValues = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
         
@@ -184,14 +184,21 @@ class AIPlayer(Player):
         # set the state that results from making the move
         newNode["potential_state"] = resultingState
         # set the value of the resulting state
-        #targetEval = self.evaluateState(resultingState) <-- Called during Neural Network training
+        targetEval = self.evaluateState(resultingState)
         actualEval = self.neuralNetwork(resultingState)
         newNode["state_value"] = actualEval
 
-        #Called during Neural Network training
+        error = targetEval - actualEval
+        print "Error: " + str(error)
+      #  print "Input to hidden weights: " + str(self.inputToHiddenWeights)
+       # print "Hidden weights to last node: " + str(self.hiddenWeightsToLastNode)
+        #print "Biases: " + str(self.biases)
         #if error >= 0.04 or error < 0.0:
          #   self.backPropagation(targetEval, actualEval)
         
+
+        
+        #backprop
         # store a reference to the parent of this node
         newNode["parent_node"] = parent
         return newNode
@@ -202,10 +209,10 @@ class AIPlayer(Player):
     #
     # Parameters:
     #   self - The object pointer
-    #   target - The output value of evaluateState()
+    #   target - The output value of evaluateState ()
     #   actual - The output value of neuralNetwork()
     #
-    # Returns: None
+    # Returns: A new node with the values initialized using the parameters
     #
     def backPropagation(self, target, actual):
         #Calculate the error term for the output node
@@ -220,10 +227,15 @@ class AIPlayer(Player):
 
             #Errorterm = nodeOutput*(1-nodeOutput)*error
             errorTerm = error * self.outputs[i] * (1-self.outputs[i])
+
             hiddenWeightErrorTerms.append(errorTerm)
 
-        
+        #learning rate: 0.2
         learningRate = 0.2
+
+        print "hiddenWeightsToLastNode length: " + str(len(self.hiddenWeightsToLastNode))
+        print "hiddenWeightErrorTerms length: " + str(len(hiddenWeightErrorTerms))
+        print "hiddenNodeXValues length: " + str(len(self.hiddenNodeXValues))
 
         #Adjust each weight in the network
         for i in range(len(self.hiddenWeightsToLastNode)):
@@ -551,6 +563,7 @@ class AIPlayer(Player):
         inputs.append(safetyMultiplier)
         inputs.append(numNonQueenAnts)
         inputs.append(enemyDistFromQueen)
+        print "inputs: " + str(inputs)
         
 
         #evaluate first layer
@@ -589,18 +602,7 @@ class AIPlayer(Player):
 
 
 
-
-    ##
-    # initializeNeuralNetwork
-    # Description: Initializes all branches in the Neural Network with random weights.
-    #
-    # Parameters:
-    #   self - The object pointer
-    #
-    # Return: None
-    #
-    #
-    # 
+    #initializeNeuralNetwork
     def initializeNeuralNetwork(self):
 
         #Randomize weights from inputs to hidden nodes
